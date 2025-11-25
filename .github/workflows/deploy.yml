@@ -1,0 +1,30 @@
+name: Auto Deploy to DO Ubuntu
+
+on:
+  push:
+    branches: ["main"]  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+    - name: Disable host key checking
+      run: |
+        echo -e "Host *\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+
+    - name: Deploy to DigitalOcean Droplet
+      run: |
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          cd /opt/ai_agent &&
+          git pull &&
+          systemctl restart ai_agent
+        "

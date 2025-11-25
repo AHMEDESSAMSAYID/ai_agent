@@ -1,20 +1,52 @@
-CITY_MAP = {
-    "جدة": "Jeddah",
-    "جده": "Jeddah",
-    "الرياض": "Riyadh",
-    "رياض": "Riyadh",
-    "دمام": "Dammam",
-    "الدمام": "Dammam",
-    "مكة": "Mecca",
-    "مكه": "Mecca",
-}
+# ============================
+# multilingual normalizer layer
+# ============================
 
-def normalize_city(city: str | None) -> str | None:
-    if not city:
-        return None
-    city = city.strip()
-    # لو المدينة بالعربي
-    if city in CITY_MAP:
-        return CITY_MAP[city]
-    # لو المدينة بالإنجليزي
-    return city.capitalize()
+import re
+from langdetect import detect
+from openai import OpenAI
+
+# تأكد إن عندك key في environment
+client = OpenAI()
+
+def clean_basic(text: str) -> str:
+    """تنظيف بسيط قبل إرسال النص للموديل"""
+    text = text.strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def translate_to_english(text: str) -> str:
+    """ترجمة النص إلى الإنجليزية باستخدام موديل خفيف"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Translate the following text to English ONLY."},
+                {"role": "user", "content": text},
+            ],
+        )
+        return response.choices[0].message.content.strip()
+    except:
+        return text  # fallback لو حصل خطأ
+
+
+def semantic_normalize(text: str) -> str:
+    """
+    - يكشف اللغة
+    - يترجم العربي
+    - يرجّع نص جاهز لعمل embeddings
+    """
+
+    text = clean_basic(text)
+
+    try:
+        lang = detect(text)
+    except:
+        lang = "en"
+
+    if lang == "ar":
+        translated = translate_to_english(text)
+        return translated
+    else:
+        return text

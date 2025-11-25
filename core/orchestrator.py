@@ -2,6 +2,7 @@ from typing import Dict, Any
 from agents.support_agent import SupportAgent
 from agents.operations_agent import OperationsAgent
 from core.llm_client import call_llm
+from core.normalizer import semantic_normalize
 
 ROUTER_PROMPT = """
 أنت وكيل متخصص في اختيار الوكيل الأنسب للرسالة.
@@ -24,7 +25,7 @@ class Orchestrator:
     async def llm_route(self, message: str) -> str:
         route = await call_llm(
             system_prompt=ROUTER_PROMPT,
-            user_message=message
+            user_message=semantic_normalize(message)
         )
         route = route.strip().lower()
 
@@ -34,7 +35,7 @@ class Orchestrator:
 
     async def handle(self, message: str, context: Dict[str, Any]):
         # اختيار الذكي للوكيل
-        agent_name = await self.llm_route(message)
+        agent_name = await self.llm_route(semantic_normalize(message))
 
         agent = self.agents.get(agent_name, self.agents["support"])
         result = await agent.handle(message, context)
