@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 from typing import List, Dict, Any
-
+import asyncio
 # داتا تجريبية (Mock) لحد ما توصلها بالـ DB الحقيقية
 MOCK_SHIPMENTS = [
     {
@@ -60,6 +60,7 @@ MOCK_SHIPMENTS = [
 
 def _matches_time_range(shipment: Dict[str, Any], time_range: str | None) -> bool:
     # حالياً هنطنّش الـ time_range (تقدر تطوّرها لاحقاً)
+    await asyncio.sleep(0)
     return True
 
 
@@ -82,6 +83,7 @@ def get_delayed_shipments(
         if not _matches_time_range(sh, time_range):
             continue
         results.append(sh)
+    await asyncio.sleep(0)
     return results
 
 
@@ -98,7 +100,7 @@ def get_city_summary(city: str) -> Dict[str, Any]:
         if delayed
         else 0
     )
-
+    await asyncio.sleep(0)
     return {
         "city": city,
         "total_shipments": total,
@@ -124,7 +126,7 @@ def get_driver_performance(driver: str) -> Dict[str, Any]:
         if delayed
         else 0
     )
-
+    await asyncio.sleep(0)
     return {
         "driver": driver,
         "total_shipments": total,
@@ -150,6 +152,7 @@ def list_shipments_by_status(
         if status != "any" and s["status"].lower() != status:
             continue
         results.append(s)
+    await asyncio.sleep(0)
     return results
 
 
@@ -163,6 +166,7 @@ def get_area_heatmap(city: str | None = None) -> Dict[str, int]:
             continue
         area = s.get("area") or "Unknown"
         counter[area] += 1
+    await asyncio.sleep(0)
     return dict(counter)
 
 
@@ -182,4 +186,5 @@ def analyze_failure_reasons(
             continue
         reason = s.get("failure_reason") or "Unknown"
         counter[reason] += 1
+    await asyncio.sleep(0)
     return dict(counter)
