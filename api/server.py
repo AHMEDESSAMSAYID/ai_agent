@@ -36,4 +36,4 @@ async def chat_endpoint(req: ChatRequest):
         tool_result=result.get("tool_result"),
         entities=result.get("entities"),
     )
-print(" AI Ops Backend is running..." )
+print(" fd AI Ops Backend is running..." )
