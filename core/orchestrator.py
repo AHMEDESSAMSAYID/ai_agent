@@ -2,7 +2,7 @@ from typing import Dict, Any
 from agents.support_agent import SupportAgent
 from agents.operations_agent import OperationsAgent
 from core.llm_client import call_llm
-from core.normalizer import semantic_normalize
+from core.normalizer import normalize_city
 
 ROUTER_PROMPT = """
 أنت وكيل متخصص في اختيار الوكيل الأنسب للرسالة.
