@@ -31,7 +31,7 @@ def translate_to_english(text: str) -> str:
         return text  # fallback لو حصل خطأ
 
 
-def semantic_normalize(text: str) -> str:
+def normalize_city(text: str) -> str:
     """
     - يكشف اللغة
     - يترجم العربي

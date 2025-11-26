@@ -1,4 +1,5 @@
 fastapi==0.110.0
+langdetect
 uvicorn[standard]==0.27.1
 gunicorn==21.2.0
 

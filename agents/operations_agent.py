@@ -4,7 +4,6 @@ from typing import Dict, Any
 import json
 from core.normalizer import normalize_city
 
-
 from agents.base import BaseAgent
 from core.llm_client import call_llm
 from core.nlp import extract_entities
