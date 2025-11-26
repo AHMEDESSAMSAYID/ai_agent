@@ -2,7 +2,7 @@
 
 from typing import Dict, Any
 import json
-from core.normalizer import ‎semantic_normalize
+from core.normalizer import ‎normalize_city
 
 
 from agents.base import BaseAgent
