@@ -25,7 +25,7 @@ class Orchestrator:
     async def llm_route(self, message: str) -> str:
         route = await call_llm(
             system_prompt=ROUTER_PROMPT,
-            user_message=semantic_normalize(message)
+            user_message=normalize_city(message)
         )
         route = route.strip().lower()
 
@@ -35,7 +35,7 @@ class Orchestrator:
 
     async def handle(self, message: str, context: Dict[str, Any]):
         # اختيار الذكي للوكيل
-        agent_name = await self.llm_route(semantic_normalize(message))
+        agent_name = await self.llm_route(normalize_city(message))
 
         agent = self.agents.get(agent_name, self.agents["support"])
         result = await agent.handle(message, context)
