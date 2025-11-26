@@ -4,10 +4,10 @@
 
 import re
 from langdetect import detect
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # تأكد إن عندك key في environment
-client = OpenAI()
+client = AsyncOpenAI()
 
 def clean_basic(text: str) -> str:
     """تنظيف بسيط قبل إرسال النص للموديل"""
@@ -28,6 +28,7 @@ def translate_to_english(text: str) -> str:
         )
         return response.choices[0].message.content.strip()
     except:
+
         return text  # fallback لو حصل خطأ
 
 

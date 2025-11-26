@@ -48,7 +48,7 @@ class OperationsAgent(BaseAgent):
 
         # 2) اختيار الأداة المناسبة حسب intent
         if intent == "delay_report":
-            tool_result = get_delayed_shipments(
+            tool_result = await get_delayed_shipments(
                 city=city,
                 driver=driver,
                 time_range=time_range,
@@ -56,24 +56,24 @@ class OperationsAgent(BaseAgent):
 
         elif intent == "city_summary":
             if city:
-                tool_result = get_city_summary(city)
+                tool_result = await get_city_summary(city)
 
         elif intent == "driver_report":
             if driver:
-                tool_result = get_driver_performance(driver)
+                tool_result = await get_driver_performance(driver)
 
         elif intent == "status_list":
             # لو مفيش status، نخليه any
-            tool_result = list_shipments_by_status(
+            tool_result = await list_shipments_by_status(
                 status=status or "any",
                 city=city,
             )
 
         elif intent == "area_heatmap":
-            tool_result = get_area_heatmap(city=city)
+            tool_result = await get_area_heatmap(city=city)
 
         elif intent == "failure_reasons":
-            tool_result = analyze_failure_reasons(
+            tool_result = await analyze_failure_reasons(
                 city=city,
                 time_range=time_range,
             )

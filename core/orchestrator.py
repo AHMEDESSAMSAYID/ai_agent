@@ -27,7 +27,7 @@ class Orchestrator:
             system_prompt=ROUTER_PROMPT,
             user_message=normalize_city(message)
         )
-        route = route.strip().lower()
+        route = await route.strip().lower()
 
         if "operations" in route:
             return "operations"
