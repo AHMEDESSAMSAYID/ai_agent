@@ -17,7 +17,7 @@ class ChatResponse(BaseModel):
     reply: str
     tool_result: dict | list | None = None
     entities: dict | None = None
-
+  
 
 @app.post("/chat")
 async def chat_endpoint(req: ChatRequest):
@@ -36,3 +36,4 @@ async def chat_endpoint(req: ChatRequest):
         tool_result=result.get("tool_result"),
         entities=result.get("entities"),
     )
+print("🚀 AI Ops Backend is running..." )
