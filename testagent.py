@@ -1,15 +1,23 @@
 import asyncio
-from core.orchestrator import Orchestrator
+from core.nlp import extract_entities
+from db.memory_dal import MemoryDAL
 
-async def test():
-    orch = Orchestrator()
 
-    print("🟦 اختبار خدمة العملاء:")
-    res1 = await orch.handle("فين شحنتي رقم 123؟", {"user_role": "support"})
-    print(res1, "\n")
+async def main():
+    text = "عاوز تقرير عن التأخير خلال الأسبوع الماضي"
 
-    print("🟧 اختبار العمليات:")
-    res2 = await orch.handle("عايز تقرير عن التأخير في جدة", {"user_role": "operations"})
-    print(res2, "\n")
+    print("\n=== CALL 1 (Should be LLM) ===")
+    result1 = await extract_entities(text)
+    print("Result 1:", result1)
 
-asyncio.run(test())
+    print("\n=== CALL 2 (Should be CACHE) ===")
+    result2 = await extract_entities(text)
+    print("Result 2:", result2)
+
+    print("\n=== CHECK DIRECT DATABASE CACHE ===")
+    cached = await MemoryDAL.get_nlp_cache(text)
+    print("Cached in DB:", cached)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

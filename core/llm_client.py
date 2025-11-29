@@ -17,7 +17,7 @@ client = AsyncOpenAI(api_key=api_key)
 
 async def call_llm(system_prompt: str, user_message: str, extra_context: str = "") -> str:
     """تطبيع الرساله قبل الإرسال للـ LLM"""
-    normalized_message = semantic_normalize(user_message)
+    normalized_message = await semantic_normalize(user_message)
     """
     دالة عامة لاستدعاء الـ LLM
     """

@@ -1,50 +1,107 @@
 # ai_agent/core/nlp.py
 
 import json
+import re
 from typing import Dict, Any
+
 from core.llm_client import call_llm
+from db.memory_dal import MemoryDAL
+
+
+CITY_MAP = {
+    "جدة": "Jeddah",
+    "جده": "Jeddah",
+    "الرياض": "Riyadh",
+    "رياض": "Riyadh",
+    "دمام": "Dammam",
+    "الدمام": "Dammam",
+}
 
 EXTRACTION_PROMPT = """
 أنت مسؤول عن تحليل طلبات تخص عمليات شركة لوجستيات.
 
-من الرسالة القادمة، استخرج المعلومات التالية إن وجدت:
-- intent: نوع الطلب. واحد من:
-  - delay_report
-  - city_summary
-  - driver_report
-  - status_list
-  - area_heatmap
-  - failure_reasons
-- city: اسم المدينة إن وجد (مثال: Jeddah, Riyadh, جدة، الرياض)
-- driver: اسم السائق إن وجد
-- status: حالة الشحنات إن وجدت (delayed, delivered, any)
-- time_range: فترة زمنية إن وجدت (today, yesterday, last_week, last_7_days)
-- tracking: رقم شحنة إن وجد
+استخرج فقط:
+intent, city, driver, status, time_range, tracking
 
-أرجع النتيجة بصيغة JSON فقط، بدون أي نص إضافي.
-مثال:
-{"intent": "delay_report", "city": "Jeddah", "driver": null, "status": "delayed", "time_range": "last_week", "tracking": null}
+أرجع JSON فقط بدون أي نص إضافي.
 """
 
+
+async def _normalize_entities(data: Dict[str, Any]) -> Dict[str, Any]:
+    """تنظيف وضبط المفاتيح"""
+    city = data.get("city")
+    if city:
+        data["city"] = CITY_MAP.get(str(city).strip(), city)
+
+    fields = ["intent", "city", "driver", "status", "time_range", "tracking"]
+    for f in fields:
+        data.setdefault(f, None)
+
+    return data
+
+
 async def extract_entities(text: str) -> Dict[str, Any]:
+    """
+    NLP + PostgreSQL Cache
+    """
+
+    # -----------------------------------------
+    # 1) CHECK CACHE
+    # -----------------------------------------
+    cached = await MemoryDAL.get_nlp_cache(text)
+    if cached:
+        print("🔵 NLP CACHE HIT")
+        return await _normalize_entities(cached)
+
+    print("🟠 NLP CACHE MISS → calling LLM")
+
+    # -----------------------------------------
+    # 2) CALL LLM
+    # -----------------------------------------
     raw = await call_llm(
         system_prompt=EXTRACTION_PROMPT,
         user_message=text,
-        extra_context=""
     )
 
-    # نحاول نقرأ JSON من الرد
-    try:
-        # لو الـ model رجع كلام قبل/بعد JSON، نحاول نلقط أول { لآخر }
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start != -1 and end != -1:
-            raw = raw[start : end + 1]
+    raw = raw.replace("```json", "").replace("```", "").strip()
 
-        data = json.loads(raw)
-        if not isinstance(data, dict):
-            return {}
-        return data
+    # -----------------------------------------
+    # 3) EXTRACT JSON
+    # -----------------------------------------
+    matches = re.findall(r"\{[\s\S]*?\}", raw)
+    if not matches:
+        print("⚠️ NLP: no JSON detected:", raw)
+        return await _normalize_entities({})
+
+    json_text = matches[0]
+
+    json_text = (
+        json_text.replace("NULL", "null")
+                 .replace("TRUE", "true")
+                 .replace("FALSE", "false")
+    )
+
+    try:
+        data = json.loads(json_text)
+    except:
+        print("⚠️ JSON Parse Error:", json_text)
+        data = {}
+
+    if not isinstance(data, dict):
+        data = {}
+
+    data = await _normalize_entities(data)
+
+    # -----------------------------------------
+    # 4) SAVE TO CACHE (JSONB)
+    # -----------------------------------------
+    try:
+        await MemoryDAL.save_nlp_cache(
+            text,
+            json.dumps(data, ensure_ascii=False)  # <-- IMPORTANT!
+        )
+        print("🟢 NLP CACHE SAVED")
     except Exception as e:
-        print("❗ NLP parsing error:", e, "| raw:", raw)
-        return {}
+        print("⚠️ Cache Save Error:", e)
+
+    return data

@@ -2,12 +2,16 @@
 # multilingual normalizer layer
 # ============================
 
+import os
 import re
 from langdetect import detect
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # تأكد إن عندك key في environment
-client = AsyncOpenAI()
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def clean_basic(text: str) -> str:
     """تنظيف بسيط قبل إرسال النص للموديل"""
@@ -16,10 +20,10 @@ def clean_basic(text: str) -> str:
     return text
 
 
-def translate_to_english(text: str) -> str:
+async def translate_to_english(text: str) -> str:
     """ترجمة النص إلى الإنجليزية باستخدام موديل خفيف"""
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.acreate(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "Translate the following text to English ONLY."},
@@ -32,7 +36,7 @@ def translate_to_english(text: str) -> str:
         return text  # fallback لو حصل خطأ
 
 
-def normalize_city(text: str) -> str:
+async def semantic_normalize(text: str) -> str:
     """
     - يكشف اللغة
     - يترجم العربي
@@ -47,7 +51,7 @@ def normalize_city(text: str) -> str:
         lang = "en"
 
     if lang == "ar":
-        translated = translate_to_english(text)
+        translated = await translate_to_english(text)
         return translated
     else:
         return text
