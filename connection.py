@@ -1,6 +1,7 @@
 import asyncpg
 import os
 from dotenv import load_dotenv
+from pgvector.asyncpg import register_vector
 
 load_dotenv()
 
@@ -31,8 +32,12 @@ async def get_pool():
             max_size=5,
         )
         print("🟢 PostgreSQL pool initialized")
+        async with _pool.acquire() as conn:
+            await register_vector(conn)
 
     return _pool
+
+
 
 
 async def get_connection():

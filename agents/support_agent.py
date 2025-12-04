@@ -1,24 +1,23 @@
-# ai_agent/agents/support_agent.py
+# agents/support_agent.py
 
 import asyncio
 import json
 import re
 from typing import Any, Dict
 
+from core.corrections import detect_correction
 from agents.base import BaseAgent
 from core.llm_client import call_llm
+from core.nlp import extract_entities
 from tools.shipments import get_shipment_status
 
-
 SUPPORT_PROMPT = """
-أنت وكيل خدمة عملاء محترف في شركة لوجستيات.
+أنت وكيل خدمة عملاء محترف.
 
 القواعد:
-- إذا ذكر المستخدم رقم شحنة، استخرج الرقم وتحقق من حالتها.
-- لا تخترع بيانات غير موجودة في extra_context.
-- إذا كانت الشحنة موجودة: اشرح حالتها بلطف وبشكل مهني.
-- إذا لم تكن موجودة: اعتذر باحترام.
-- الرد يجب أن يكون مختصر وواضح.
+- إذا وجد نظام الشحنة رقم تتبع أو رقم أوردر → اعرض حالتها بدقة.
+- لا تخمن معلومات غير موجودة في extra_context.
+- الرد مهني ومختصر وواضح.
 """
 
 
@@ -26,64 +25,82 @@ class SupportAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="support")
 
-    async def handle(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle(self, message: str, context: Dict[str, Any]):
 
-        # ============ Short-Term Memory ============
+        # =============== Short-Term Memory ===============
         await self.remember_message(role="user", content=message)
-        recent = await self.get_recent_messages(3)
-        recent_msgs = [
-            f"{m['role']}: {m['content']}"
-            for m in (recent or [])
-        ]
 
-        # ============ Episode ID ============
+        recent = await self.get_recent_messages(3)
+        recent_msgs = [f"{m['role']}: {m['content']}" for m in recent]
+
+        # =============== Episode ID ===============
         episode_id = context.get("episode_id", "default")
 
-        # سجل رسالة المستخدم داخل الأحداث
         await self.remember_event(
             episode_id=episode_id,
             content=message,
-            kind="user_message"
+            kind="user_message",
         )
 
-        # ============ استخراج Tracking Numbers ============
-        tracking_numbers = re.findall(r"\d+", message)
-        tool_results = []
+        # =============== Corrections ===============
+        correction = await detect_correction(message)
 
-        if tracking_numbers:
-            for number in tracking_numbers:
-                status = await asyncio.to_thread(get_shipment_status, number)
+        if context.get("user_role") == "manager" and correction.get("is_correction"):
 
-                tool_results.append({
-                    "tracking_number": number,
-                    "status": status
-                })
+            await self.remember_knowledge(
+                content=f"{correction['key']} = {correction['value']}",
+                category=correction["type"],
+            )
 
-        # سجل tracking numbers
-        await self.remember_event(
-            episode_id=episode_id,
-            content=json.dumps(tracking_numbers, ensure_ascii=False),
-            kind="tracking_detected"
-        )
+            await self.remember_event(
+                episode_id=episode_id,
+                content=json.dumps(correction, ensure_ascii=False),
+                kind="correction_saved",
+            )
 
-        # سجل tool output
-        await self.remember_event(
-            episode_id=episode_id,
-            content=json.dumps(tool_results, ensure_ascii=False),
-            kind="tool_output"
-        )
-
-        # ============ Long-Term Memory ============
+        # =============== Long-Term Memory ===============
         rules = await self.get_knowledge("rule")
         styles = await self.get_knowledge("style")
 
         long_term_text = "\n".join(
-            f"[{item['kind']}] {item['content']}"
-            for item in (rules + styles)
+            f"[{item['kind']}] {item['content']}" for item in (rules + styles)
         )
 
-        # ============ LLM Preparation ============
+        # =============== Slots ===============
+        slots = context.get("slots") or (await extract_entities(message))
+
+        intent = slots.get("intent")
+        tracking = slots.get("tracking")
+        order_id = slots.get("order_id")
+
+        tool_results = []
+
+        # =============== Fallback Regex Detection ===============
+        if not tracking and not order_id:
+            nums = re.findall(r"\d{3,}", message)
+            if nums:
+                order_id = nums[0]
+
+        # =============== Tool Call ===============
+        number = tracking or order_id
+        if number:
+            status = await get_shipment_status(number)
+            tool_results.append({
+                "number": number,
+                "status": status,
+                "is_tracking": bool(tracking),
+                "is_order_id": bool(order_id)
+            })
+
+        await self.remember_tool_output(
+            episode_id=episode_id,
+            output=tool_results,
+        )
+
+        # =============== LLM ===============
         extra_context = {
+            "intent": intent,
+            "slots": slots,
             "tracking_results": tool_results,
             "recent_messages": recent_msgs,
             "long_term_memory": long_term_text,
@@ -95,18 +112,16 @@ class SupportAgent(BaseAgent):
             extra_context=json.dumps(extra_context, ensure_ascii=False),
         )
 
-        # سجل رد الوكيل
         await self.remember_event(
             episode_id=episode_id,
             content=reply,
-            kind="agent_reply"
+            kind="agent_reply",
         )
-
-        await asyncio.sleep(0)
 
         return {
             "agent": self.name,
             "reply": reply,
+            "slots": slots,
             "tool_result": tool_results,
-            "episode_id": episode_id
+            "episode_id": episode_id,
         }

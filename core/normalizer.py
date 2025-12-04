@@ -48,7 +48,7 @@ async def semantic_normalize(text: str) -> str:
     try:
         lang = detect(text)
     except:
-        lang = "en"
+        lang = "ar"
 
     if lang == "ar":
         translated = await translate_to_english(text)

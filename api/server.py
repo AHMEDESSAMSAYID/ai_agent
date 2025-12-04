@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from pydantic import BaseModel
 from core.orchestrator import Orchestrator
@@ -29,6 +30,7 @@ async def chat_endpoint(req: ChatRequest):
     }
 
     result = await orch.handle(req.message, context)
+    await asyncio.sleep(0)
 
     return ChatResponse(
         agent=result.get("agent"),
@@ -36,6 +38,3 @@ async def chat_endpoint(req: ChatRequest):
         tool_result=result.get("tool_result"),
         entities=result.get("entities"),
     )
-print(" fd AI Ops Backend is running..." )
-print(" ahmedadee" )
-print(" ahmedadee" )

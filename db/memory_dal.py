@@ -1,155 +1,153 @@
-from typing import Any, Dict, List
-from connection import get_pool
 import json
+from connection import get_pool
 
 
+# ======================================================
+# SHORT-TERM MEMORY DAL
+# ======================================================
 class MemoryDAL:
 
-    # --------------------------------
-    # SHORT TERM MEMORY
-    # --------------------------------
     @staticmethod
-    async def add_short_term(agent_name: str, item: Dict[str, Any]):
+    async def add_short_term(agent_name: str, role: str, content: str,
+                             kind: str = "message", metadata=None):
+
+        if metadata is None:
+            metadata = {}
+
+        metadata_json = json.dumps(metadata, ensure_ascii=False)
+
         pool = await get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO short_term_messages (agent_name, role, content, kind, meta)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO short_term_messages (agent_name, role, content, kind, metadata)
+                VALUES ($1, $2, $3, $4, $5::jsonb)
                 """,
                 agent_name,
-                item["role"],
-                item["content"],
-                item["kind"],
-                item["meta"],
+                role,
+                content,
+                kind,
+                metadata_json,
             )
 
     @staticmethod
-    async def get_recent(agent_name: str, n: int = 5):
+    async def get_recent_short_term(limit: int = 5):
         pool = await get_pool()
+
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT role, content, kind, meta, timestamp
+                SELECT id, agent_name, role, content, kind, metadata, created_at
                 FROM short_term_messages
-                WHERE agent_name = $1
                 ORDER BY id DESC
-                LIMIT $2
+                LIMIT $1
                 """,
-                agent_name, n
+                limit
             )
-        return [dict(r) for r in rows]
 
-    # --------------------------------
-    # EPISODIC MEMORY
-    # --------------------------------
+        result = []
+        for r in rows:
+            row = dict(r)
+            try:
+                row["metadata"] = json.loads(row["metadata"]) if row["metadata"] else {}
+            except:
+                row["metadata"] = {}
+            result.append(row)
+        return result
+
+
+# ======================================================
+# LONG-TERM MEMORY DAL
+# ======================================================
+class LongTermDAL:
+
     @staticmethod
-    async def add_event(episode_id: str, agent_name: str, item: Dict[str, Any]):
+    async def add_knowledge(agent_name: str, content, category: str):
+
+        # حول المحتوى دائماً إلى JSON
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+
         pool = await get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO episodic_events (episode_id, agent_name, kind, content, meta)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO long_term_knowledge (agent_name, category, content)
+                VALUES ($1, $2, $3::jsonb)
                 """,
-                episode_id,
                 agent_name,
-                item["kind"],
-                item["content"],
-                item["meta"],
+                category,
+                content
+            )
+
+    @staticmethod
+    async def get_knowledge(agent_name: str, category: str):
+        pool = await get_pool()
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, agent_name, category, content, meta, timestamp
+                FROM long_term_knowledge
+                WHERE agent_name = $1 AND category = $2
+                ORDER BY id DESC
+                """,
+                agent_name,
+                category
+            )
+
+        result = []
+        for r in rows:
+            item = dict(r)
+            try:
+                item["content"] = json.loads(item["content"])
+            except:
+                pass
+            result.append(item)
+
+        return result
+
+
+# ======================================================
+# EPISODIC MEMORY DAL
+# ======================================================
+class EpisodicDAL:
+
+    @staticmethod
+    async def add_event(agent_name: str, episode_id: str, content, kind: str):
+
+        # حول content إلى JSON دائماً
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+        else:
+            content = json.dumps({"text": content}, ensure_ascii=False)
+
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO episodic_events (agent_name, episode_id, content, kind)
+                VALUES ($1, $2, $3::jsonb, $4)
+                """,
+                agent_name,
+                episode_id,
+                content,
+                kind
             )
 
     @staticmethod
     async def get_events(episode_id: str):
         pool = await get_pool()
+
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT kind, content, meta, timestamp
+                SELECT id, agent_name, episode_id, content, kind, created_at
                 FROM episodic_events
                 WHERE episode_id = $1
                 ORDER BY id ASC
                 """,
                 episode_id
             )
+
         return [dict(r) for r in rows]
-
-    # --------------------------------
-    # LONG TERM KNOWLEDGE
-    # --------------------------------
-    @staticmethod
-    async def add_long_term(agent_name: str, category: str, content: str, meta: Dict[str, Any]):
-        pool = await get_pool()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO long_term_knowledge (agent_name, category, content, meta)
-                VALUES ($1, $2, $3, $4)
-                """,
-                agent_name, category, content, meta
-            )
-
-    @staticmethod
-    async def get_long_term(agent_name: str, category: str):
-        pool = await get_pool()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT category, content, meta, timestamp
-                FROM long_term_knowledge
-                WHERE agent_name = $1 AND category = $2
-                ORDER BY id ASC
-                """,
-                agent_name, category
-            )
-        return [dict(r) for r in rows]
-
-    # --------------------------------
-    # NLP CACHE
-    # --------------------------------
-        # --------------------------------
-    # NLP CACHE
-    # --------------------------------
-    @staticmethod
-    async def get_nlp_cache(input_text: str):
-        pool = await get_pool()
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                SELECT entities
-                FROM nlp_cache
-                WHERE input_text = $1
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                input_text,
-            )
-        if not row:
-            return None
-
-        entities_json = row["entities"]
-
-    # لو اللي راجع string → نحوله dict
-        if isinstance(entities_json, str):
-
-            try:
-               return json.loads(entities_json)
-            except:
-               return None
-
-    # لو asyncpg رجع JSONB جاهز
-        return entities_json
-
-
-    @staticmethod
-    async def save_nlp_cache(input_text: str, entities_json: str):
-        pool = await get_pool()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO nlp_cache (input_text, entities)
-                VALUES ($1, $2::jsonb)
-                """,
-                input_text,
-                entities_json,
-            )

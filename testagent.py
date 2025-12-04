@@ -1,23 +1,53 @@
 import asyncio
-from core.nlp import extract_entities
-from db.memory_dal import MemoryDAL
+from core.orchestrator import Orchestrator
+from core.entity_normalizer import EntityNormalizer
 
+# ---------------------------
+# Test Sentences
+# ---------------------------
 
-async def main():
-    text = "عاوز تقرير عن التأخير خلال الأسبوع الماضي"
+TEST_CASES = [
+    "ابعت عمرو على القاهرة بكرة",
+    "فين السواق خالد؟",
+    "عايز تقرير عن السواق عمرو",
+    "عايز اعرف الشحنة رقم 445 وصلت ولا لا",
+    "اعمل تقرير عن مدينة الجيزة",
+    "ايه التأخيرات اللي حصلت امبارح؟",
+    "اتابع شحنتي 99887",
+]
 
-    print("\n=== CALL 1 (Should be LLM) ===")
-    result1 = await extract_entities(text)
-    print("Result 1:", result1)
+async def test_agents():
+    orch = Orchestrator()
+    nlp = EntityNormalizer()
 
-    print("\n=== CALL 2 (Should be CACHE) ===")
-    result2 = await extract_entities(text)
-    print("Result 2:", result2)
+    print("\n====================")
+    print("🔍 NLP ONLY TEST")
+    print("====================\n")
 
-    print("\n=== CHECK DIRECT DATABASE CACHE ===")
-    cached = await MemoryDAL.get_nlp_cache(text)
-    print("Cached in DB:", cached)
+    for text in TEST_CASES:
+        slots = await nlp.parse_all(text)
+        print(f"📝 نص: {text}")
+        print(f"🎯 Slots: {slots}")
+        print("-" * 40)
 
+    print("\n====================")
+    print("🤖 AGENT ROUTING TEST")
+    print("====================\n")
+
+    context = {"episode_id": "test_episode", "user_role": "user"}
+
+    for text in TEST_CASES:
+        print(f"\n====================")
+        print(f"📝 الرسالة: {text}")
+        print("====================")
+
+        result = await orch.handle(text, context)
+
+        print(f"🤖 الوكيل المختار: {result['selected_agent']}")
+        print(f"🎯 Entities: {result['slots']}")
+        print(f"🛠 Tool Result: {result.get('tool_result')}")
+        print(f"💬 Reply: {result['reply']}")
+        print("-" * 60)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_agents())
