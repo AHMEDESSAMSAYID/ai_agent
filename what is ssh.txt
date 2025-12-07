@@ -31,3 +31,8 @@ chmod
 بناء style learning system من long-term memory
 
 ربط NLP مع PostgreSQL عبر caching لتحسين الأداء
+
+ضبط لك WebRTC Streaming Real-Time (بدون 3-second chunks)
+2️⃣ أبني لك صوت قطري مُخصّص (Custom TTS Voice Training)
+3️⃣ أشبّك TTS بخطوط STT على Asterisk مكالمة حقيقية
+4️⃣ أضيف VAD (Voice Activity Detection) عشان الوكيل يقاطع ويتفاعل طبيعي

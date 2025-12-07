@@ -32,6 +32,8 @@ INTENT_SYSTEM_PROMPT = """
 }
 """
 
+# nlp/intent_classifier.py (الكود المُحدَّث)
+
 class IntentClassifier:
     async def classify(self, message: str) -> Dict[str, str]:
         raw = await call_llm(
@@ -40,14 +42,26 @@ class IntentClassifier:
         )
 
         raw = raw.strip()
+        
+        # 💡 إضافة: إزالة أي محددات (```json) التي يضيفها LLM
+        raw = raw.replace("```json", "").replace("```", "").strip() 
 
         # محاولات parsing آمنة
         try:
-            data = json.loads(raw)
+            # 💡 إضافة: محاولة العثور على أقواس JSON { } لزيادة المرونة
+            start = raw.find("{")
+            end = raw.rfind("}")
+
+            if start != -1 and end != -1:
+                json_string = raw[start:end+1]
+            else:
+                json_string = raw # نعود للنص الكامل إذا لم نجد الأقواس
+
+            data = json.loads(json_string)
             intent = data.get("intent", "unknown")
             agent = data.get("agent", "support")
         except Exception:
-            # fallback بسيط
+            # fallback بسيط عند فشل LLM أو الـ parsing
             intent = "unknown"
             agent = "support"
 

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>OpenAI WebRTC Realtime</title>
+</head>
+<body>
+
+<h2>🎙️ Voice Agent Realtime (OpenAI WebRTC)</h2>
+<button id="startBtn">▶ ابدأ</button>
+
+<script>
+async function start() {
+
+    // 1) احصل على SDP من WebRTC المتصفح
+    const pc = new RTCPeerConnection();
+
+    // استلام الصوت من OpenAI
+    const audio = new Audio();
+    audio.autoplay = true;
+
+    pc.ontrack = (ev) => {
+        audio.srcObject = ev.streams[0];
+    };
+
+    // إرسال صوت الميكروفون
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mic.getTracks().forEach(t => pc.addTrack(t, mic));
+
+    // اصنع OFFER
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // 2) أرسل الـ SDP إلى باك إند
+    const sdpResponse = await fetch("https://palpebral-inconsiderate-dovie.ngrok-free.dev/realtime/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/sdp" },
+        body: offer.sdp
+    });
+
+    if (!sdpResponse.ok) {
+        console.error(await sdpResponse.text());
+        return;
+    }
+
+    const answerSDP = await sdpResponse.text();
+
+    // 3) ضع SDP OPENAI كـ remote description
+    await pc.setRemoteDescription({
+        type: "answer",
+        sdp: answerSDP
+    });
+
+    console.log("🎉 WebRTC Connected!");
+}
+
+document.getElementById("startBtn").onclick = start;
+</script>
+
+
+</body>
+</html>
